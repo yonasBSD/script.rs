@@ -1266,7 +1266,7 @@ pub fn parse_raw_string_literal(
         // Start with 1 because the first '#' is already consumed
         hash_count = 1;
 
-        while let Some('#') = stream.peek_next() {
+        while Some('#') == stream.peek_next() {
             stream.eat_next_and_advance(pos);
             hash_count += 1;
         }
@@ -1893,6 +1893,8 @@ fn get_next_token_inner(
                 let token = if let Some(radix) = radix_base {
                     let result = &result[2..];
 
+                    // Deliberately allow signed integers to be created from unsigned parsing
+                    #[allow(clippy::cast_possible_wrap)]
                     UNSIGNED_INT::from_str_radix(result, radix)
                         .map(|v| v as INT)
                         .map_or_else(
@@ -2666,7 +2668,7 @@ pub struct TokenIterator<'a> {
     pub token_mapper: Option<&'a OnParseTokenCallback>,
 }
 
-impl<'a> Iterator for TokenIterator<'a> {
+impl Iterator for TokenIterator<'_> {
     type Item = (Token, Position);
 
     fn next(&mut self) -> Option<Self::Item> {
