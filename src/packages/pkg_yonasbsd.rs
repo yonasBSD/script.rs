@@ -14,13 +14,15 @@ def_package! {
     /// * [`BasicShellPackage`][super::BasicShellPackage]
     /// * [`BasicJsonPackage`][super::BasicJsonPackage]
     /// * [`BasicSemverPackage`][super::BasicSemverPackage]
+    /// * [`BasicPlotsPackage`][super::BasicPlotsPackage]
     pub YonasBSDPackage(lib) :
             #[cfg(not(feature = "no_fs"))] BasicFilesystemPackage,
             #[cfg(not(feature = "no_env"))] BasicEnvironmentPackage,
             #[cfg(not(feature = "no_shell"))] BasicShellPackage,
             #[cfg(not(feature = "no_json"))] BasicJsonPackage,
             //#[cfg(not(feature = "no_yaml"))] BasicYamlPackage,
-            #[cfg(not(feature = "no_semver"))] BasicSemverPackage
+            #[cfg(not(feature = "no_semver"))] BasicSemverPackage,
+            #[cfg(not(feature = "no_plots"))] BasicPlotsPackage
     {
         lib.set_standard_lib(true);
     }

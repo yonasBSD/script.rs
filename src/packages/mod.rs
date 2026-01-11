@@ -24,6 +24,7 @@ pub(crate) mod shell_basic;
 pub(crate) mod string_basic;
 pub(crate) mod string_more;
 pub(crate) mod time_basic;
+pub(crate) mod plots_basic;
 
 pub use arithmetic::ArithmeticPackage;
 #[cfg(not(feature = "no_index"))]
@@ -57,6 +58,8 @@ pub use string_basic::BasicStringPackage;
 pub use string_more::MoreStringPackage;
 #[cfg(not(feature = "no_time"))]
 pub use time_basic::BasicTimePackage;
+#[cfg(not(feature = "no_plots"))]
+pub use plots_basic::BasicPlotsPackage;
 
 /// Trait that all packages must implement.
 pub trait Package {

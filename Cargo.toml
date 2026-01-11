@@ -40,6 +40,7 @@ rustyline = { version = "15.0.0", optional = true }
 document-features = { version = "0.2.0", optional = true }
 arbitrary = { version = "1.3.2", optional = true, features = ["derive"] }
 glob = { version = "0.3.3", optional = true }
+ruviz = { git = "https://github.com/yonasBSD/ruviz", branch = "feat/freebsd", optional = true }
 
 [dev-dependencies]
 rmp-serde = "1.1.1"
@@ -74,7 +75,7 @@ bin-features = ["decimal", "metadata", "serde", "debugging", "rustyline"]
 fuzz = ["arbitrary", "rust_decimal?/rust-fuzz", "serde"]
 
 ## Standard Library
-stdlib = ["fs", "env", "shell", "strings", "utils"]
+stdlib = ["fs", "env", "shell", "strings", "utils", "plots"]
 ## Filesystem
 fs = ["dep:glob"]
 ## Environement variables
@@ -93,6 +94,8 @@ yaml = []
 utils = ["semver"]
 ## semver
 semver = []
+## plots
+plots = ["dep:ruviz"]
 
 #! ### System Configuration Features
 
@@ -123,7 +126,7 @@ no_module = []
 ## Remove support for custom syntax.
 no_custom_syntax = []
 ## Remove stdlib
-no_stdlib = ["no_fs", "no_env", "no_shell", "no_strings", "no_utils"]
+no_stdlib = ["no_fs", "no_env", "no_shell", "no_strings", "no_utils", "no_plots"]
 ## Remove filesystem
 no_fs = []
 ## Environement variables
@@ -142,6 +145,8 @@ no_yaml = []
 no_utils = ["no_semver"]
 ## semver
 no_semver = []
+## plots
+no_plots = []
 
 #! ### Performance-Related Features
 

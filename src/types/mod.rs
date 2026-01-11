@@ -14,6 +14,7 @@ pub mod position_none;
 pub mod scope;
 pub mod var_def;
 pub mod variant;
+pub mod plots;
 
 pub use bloom_filter::BloomFilterU64;
 pub use custom_types::{CustomTypeInfo, CustomTypesCollection};
