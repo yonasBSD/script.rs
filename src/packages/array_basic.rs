@@ -26,6 +26,31 @@ def_package! {
     }
 }
 
+pub(crate) fn index_of_start_inner(
+    ctx: &NativeCallContext,
+    array: &mut Array,
+    filter: FnPtr,
+    start: INT,
+) -> RhaiResultOf<INT> {
+    if array.is_empty() {
+        return Ok(-1);
+    }
+    let (start, ..) = calc_offset_len(array.len(), start, 0);
+    for (i, item) in array.iter_mut().enumerate().skip(start) {
+        let ex = [INT::try_from(i).unwrap_or(INT::MAX).into()];
+
+        if filter
+            .call_raw_with_extra_args("index_of", &ctx, Some(item), [], ex, Some(0))?
+            .as_bool()
+            .unwrap_or(false)
+        {
+            return Ok(INT::try_from(i).unwrap_or(INT::MAX));
+        }
+    }
+
+    Ok(-1 as INT)
+}
+
 #[export_module]
 pub mod array_functions {
     /// Number of elements in the array.
@@ -974,21 +999,7 @@ pub mod array_functions {
             return Ok(-1);
         }
 
-        let (start, ..) = calc_offset_len(array.len(), start, 0);
-
-        for (i, item) in array.iter_mut().enumerate().skip(start) {
-            let ex = [INT::try_from(i).unwrap_or(INT::MAX).into()];
-
-            if filter
-                .call_raw_with_extra_args("index_of", &ctx, Some(item), [], ex, Some(0))?
-                .as_bool()
-                .unwrap_or(false)
-            {
-                return Ok(INT::try_from(i).unwrap_or(INT::MAX));
-            }
-        }
-
-        Ok(-1 as INT)
+        index_of_start_inner(&ctx, array, filter, start)
     }
     /// Iterate through all the elements in the array, applying a `filter` function to each element
     /// in turn, and return a copy of the first element that returns `true`. If no element returns
