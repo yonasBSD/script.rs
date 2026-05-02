@@ -26,6 +26,8 @@ def_package! {
     }
 }
 
+/// Temporary helper function supporting deprecated `index_of_by_fn_name*` functions.
+/// Can be removed in the next major version
 pub(crate) fn index_of_start_inner(
     ctx: &NativeCallContext,
     array: &mut Array,
