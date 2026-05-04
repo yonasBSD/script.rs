@@ -63,6 +63,6 @@ impl ASTFlags {
 
 impl std::fmt::Debug for ASTFlags {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", self.0)
     }
 }
