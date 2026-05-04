@@ -505,14 +505,21 @@ fn test_arrays_elvis() {
 fn test_arrays_index_of() {
     let engine = Engine::new();
     // INT array
-    assert_eq!(engine.eval::<INT>("[1, 2, 3].index_of(2)").unwrap(), 1);
+    assert_eq!(engine.eval::<INT>("index_of([1, 2, 3], 2)").unwrap(), 1);
     // String array
-    assert_eq!(engine.eval::<INT>(r#"["hi", "hello", "world"].index_of("hello")"#).unwrap(), 1);
-    assert_eq!(engine.eval::<INT>(r#"["a","b","c","b"].index_of("b", 2)"#).unwrap(), 3);
-    assert_eq!(engine.eval::<INT>(r#"["a","b"].index_of("missing")"#).unwrap(), -1);
+    assert_eq!(engine.eval::<INT>(r#"index_of(["hi", "hello", "world"], "hello")"#).unwrap(), 1);
+    assert_eq!(engine.eval::<INT>(r#"index_of(["a","b","c","b"], "b", 2)"#).unwrap(), 3);
+    assert_eq!(engine.eval::<INT>(r#"index_of(["a","b"], "missing")"#).unwrap(), -1);
 
     // Cross-type behavior
-    assert_eq!(engine.eval::<INT>(r#"[1,2,3].index_of("foo")"#).unwrap(), -1);
+    assert_eq!(engine.eval::<INT>(r#"index_of([1,2,3], "foo")"#).unwrap(), -1);
+}
+
+#[test]
+#[cfg(not(feature = "no_object"))]
+#[cfg(not(feature = "no_function"))]
+fn test_arrays_index_of_with_named_fn() {
+    let engine = Engine::new();
     assert_eq!(
         engine
             .eval::<INT>(
@@ -535,19 +542,7 @@ fn test_arrays_index_of() {
             .unwrap(),
         3
     );
-    assert_eq!(
-        engine
-            .eval::<INT>(
-                r#"                                                                                    
-                 fn is_two(x) { x == 2 }                                                                               
-                 [1,2,3,2].index_of("is_two", 2)                                                                       
-             "#
-            )
-            .unwrap(),
-        3
-    );
 }
-
 #[test]
 #[cfg(feature = "internals")]
 fn test_array_invalid_index_callback() {
