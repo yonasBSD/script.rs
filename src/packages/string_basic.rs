@@ -235,7 +235,7 @@ mod print_debug_functions {
                 result,
                 "{:?}: {}{}",
                 k,
-                &print_with_func(FUNC_TO_DEBUG, &ctx, v),
+                print_with_func(FUNC_TO_DEBUG, &ctx, v),
                 if i < len - 1 { ", " } else { "" }
             )
             .unwrap();
