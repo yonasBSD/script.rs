@@ -227,22 +227,22 @@ impl Engine {
         }
 
         // First check script-defined functions
-        let res = global.lib.iter().any(|m| m.contains_fn(hash_script))
+        let result = global.lib.iter().any(|m| m.contains_fn(hash_script))
             // Then check the global namespace and packages
             || self.global_modules.iter().any(|m| m.contains_fn(hash_script));
 
         #[cfg(not(feature = "no_module"))]
-        let res = res ||
+        let result = result ||
             // Then check imported modules
             global.contains_qualified_fn(hash_script)
             // Then check sub-modules
             || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
 
-        if !res && !cache.bloom_filter.is_absent_and_set(hash_script) {
+        if !result && !cache.bloom_filter.is_absent_and_set(hash_script) {
             // Do not cache "one-hit wonders"
             cache.dict.insert(hash_script, None);
         }
 
-        res
+        result
     }
 }
