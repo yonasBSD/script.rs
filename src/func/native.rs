@@ -256,8 +256,8 @@ impl<'a> NativeCallContext<'a> {
     pub const fn tag(&self) -> Option<&Dynamic> {
         Some(&self.global.tag)
     }
-    /// Get an iterator over the current set of modules imported via `import` statements
-    /// in reverse order.
+    /// Get an iterator over the current set of modules imported via `import` statements in reverse order
+    /// (i.e. modules imported last come first).
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
@@ -265,8 +265,7 @@ impl<'a> NativeCallContext<'a> {
     pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &crate::Module)> {
         self.global.iter_imports()
     }
-    /// Get an iterator over the namespaces containing definitions of all script-defined functions
-    /// in reverse order (i.e. parent namespaces are iterated after child namespaces).
+    /// Get an iterator over the namespaces containing definitions of all script-defined functions.
     ///
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]

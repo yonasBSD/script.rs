@@ -134,6 +134,17 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     pub fn namespaces(&self) -> &[crate::SharedModule] {
         &self.global.lib
     }
+    /// _(internals)_ Mutable reference to the current set of namespaces containing definitions of all script-defined functions.
+    /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    #[must_use]
+    pub fn namespaces_mut(&mut self) -> &mut [crate::SharedModule] {
+        self.global.lib.as_mut()
+    }
     /// The current bound `this` pointer, if any.
     #[inline(always)]
     #[must_use]
@@ -417,7 +428,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     ///     let context = context.new_frame()
     ///                          .rewind_scope(true)            // rewinds the scope...
     ///                          .with_source("new source")     // new source...
-    ///                          .with_module(new_module)       // add new module...
+    ///                          .with_namespace(new_module)    // add new namespace module...
     ///                          .up_call_level();
     ///
     ///     // Call a function with the modified context...
@@ -431,8 +442,8 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     ///
     /// Upon `Drop`, the following fields will be automatically restored to the previous values:
     ///
-    /// * the stack of imported [modules][crate::Module] will be rewound to the original depth if more [modules][crate::Module] have been added via [`EvalContextFrameGuard::with_import`].
-    /// * the stack of global [modules][crate::Module] will be rewound to the original depth if more [modules][crate::Module] have been added via [`EvalContextFrameGuard::with_module`].
+    /// * the stack of imported [modules][crate::Module] will be rewound to the original depth if more have been added via [`EvalContextFrameGuard::with_import`].
+    /// * the stack of scripted function [modules][crate::Module] will be rewound to the original depth if more have been added via [`EvalContextFrameGuard::with_namespace`].
     /// * the original functions resolution cache will be restored if a new caching layer was created via [`EvalContextFrameGuard::with_new_caching_layer`].
     /// * the original [scope][EvalContext::scope] will be rewound if [`EvalContextFrameGuard::rewind_scope`] was set to `true`.
     /// * the [source][GlobalRuntimeState::source] will be restored if a new source was set via [`EvalContextFrameGuard::with_source`] or cleared via [`EvalContextFrameGuard::clear_source`].
@@ -658,7 +669,7 @@ impl<'t> EvalContextFrameGuard<'_, '_, '_, '_, '_, '_, 't> {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub fn with_module(mut self, module: impl Into<crate::SharedModule>) -> Self {
+    pub fn with_namespace(mut self, module: impl Into<crate::SharedModule>) -> Self {
         self.lib_len = Some(self.context.global.lib.len());
         self.context.global.lib.push(module.into());
         self
