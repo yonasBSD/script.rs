@@ -848,6 +848,7 @@ use crate::plugin::*;
 #[export_module]
 pub mod deprecated_array_functions {
     use crate::packages::array_basic::array_functions::*;
+    use crate::packages::array_basic::index_of_start_inner;
     use crate::{Array, INT};
 
     /// Iterate through all the elements in the array, applying a function named by `mapper` to each
@@ -963,7 +964,25 @@ pub mod deprecated_array_functions {
         array: &mut Array,
         filter: &str,
     ) -> RhaiResultOf<INT> {
-        index_of_filter(ctx, array, FnPtr::new(filter)?)
+        if array.is_empty() {
+            return Ok(-1);
+        }
+        if let Ok(fp) = FnPtr::new(filter) {
+            match index_of_start_inner(&ctx, array, fp, 0) {
+                Ok(found) => return Ok(found),
+                Err(err) => match *err {
+                    EvalAltResult::ErrorFunctionNotFound(ref sig, ..)
+                        if sig.starts_with(filter) => {}
+                    EvalAltResult::ErrorInFunctionCall(_, _, ref inner, _) => match **inner {
+                        EvalAltResult::ErrorFunctionNotFound(ref sig, ..)
+                            if sig.starts_with(filter) => {}
+                        _ => return Err(err),
+                    },
+                    _ => return Err(err),
+                },
+            }
+        }
+        index_of_starting_from(ctx, array, filter.into(), 0)
     }
     /// Iterate through all the elements in the array, starting from a particular `start` position,
     /// applying a function named by `filter` to each element in turn, and return the index of the
@@ -1015,7 +1034,26 @@ pub mod deprecated_array_functions {
         filter: &str,
         start: INT,
     ) -> RhaiResultOf<INT> {
-        index_of_filter_starting_from(ctx, array, FnPtr::new(filter)?, start)
+        if array.is_empty() {
+            return Ok(-1);
+        }
+
+        if let Ok(fp) = FnPtr::new(filter) {
+            match index_of_start_inner(&ctx, array, fp, start) {
+                Ok(found) => return Ok(found),
+                Err(err) => match *err {
+                    EvalAltResult::ErrorFunctionNotFound(ref sig, ..)
+                        if sig.starts_with(filter) => {}
+                    EvalAltResult::ErrorInFunctionCall(_, _, ref inner, _) => match **inner {
+                        EvalAltResult::ErrorFunctionNotFound(ref sig, ..)
+                            if sig.starts_with(filter) => {}
+                        _ => return Err(err),
+                    },
+                    _ => return Err(err),
+                },
+            }
+        }
+        index_of_starting_from(ctx, array, filter.into(), start)
     }
     /// Return `true` if any element in the array that returns `true` when applied a function named
     /// by `filter`.

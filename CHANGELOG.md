@@ -8,7 +8,8 @@ Bug fixes
 ---------
 
 * `Engine::compact_script` now properly compacts scripts with custom syntax that uses `$raw$` (thanks [`@yuvalrakavy`](https://github.com/yuvalrakavy) [`#1079`](https://github.com/rhaiscript/rhai/pull/1079)).
-* The string methods `split`, `split_rev` and their variants are now marked `pure` so they can be called on constant strings (thanks [`@theJC`](https://github.com/theJC) [`#1082`](https://github.com/rhaiscript/rhai/pull/1082)).
+* The string methods `split`, `split_rev` and their variants are now marked `pure` so they can be called on `const` strings (thanks [`@theJC`](https://github.com/theJC) [`#1082`](https://github.com/rhaiscript/rhai/pull/1082)).
+* The array method `index_of` now falls back to value comparison for string argument when no script function of that name is registered (thanks [`@yinho999`](https://github.com/yinho999) [`#1086`](https://github.com/rhaiscript/rhai/pull/1086)).
 
 New features
 ------------
