@@ -152,7 +152,6 @@ impl GlobalRuntimeState {
         module: impl Into<crate::SharedModule>,
     ) {
         self.imports.push(name.into());
-
         self.modules.push(module.into());
     }
     /// Truncate the stack of globally-imported [modules][crate::Module] to a particular length.
@@ -164,7 +163,8 @@ impl GlobalRuntimeState {
         self.imports.truncate(size);
         self.modules.truncate(size);
     }
-    /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order.
+    /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order
+    /// (i.e. modules imported last come first).
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
@@ -176,7 +176,8 @@ impl GlobalRuntimeState {
             .zip(self.modules.iter().rev())
             .map(|(name, module)| (name.as_str(), &**module))
     }
-    /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order.
+    /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order
+    /// (i.e. modules imported last come first).
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]

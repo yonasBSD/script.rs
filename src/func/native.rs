@@ -256,8 +256,8 @@ impl<'a> NativeCallContext<'a> {
     pub const fn tag(&self) -> Option<&Dynamic> {
         Some(&self.global.tag)
     }
-    /// Get an iterator over the current set of modules imported via `import` statements
-    /// in reverse order.
+    /// Get an iterator over the current set of modules imported via `import` statements in reverse order
+    /// (i.e. modules imported last come first).
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
@@ -265,18 +265,7 @@ impl<'a> NativeCallContext<'a> {
     pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &crate::Module)> {
         self.global.iter_imports()
     }
-    /// _(internals)_ The current [`GlobalRuntimeState`], if any.
-    /// Exported under the `internals` feature only.
-    ///
-    /// Not available under `no_module`.
-    #[expose_under_internals]
-    #[inline(always)]
-    #[must_use]
-    const fn global_runtime_state(&self) -> &GlobalRuntimeState {
-        self.global
-    }
-    /// Get an iterator over the namespaces containing definitions of all script-defined functions
-    /// in reverse order (i.e. parent namespaces are iterated after child namespaces).
+    /// Get an iterator over the namespaces containing definitions of all script-defined functions.
     ///
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
@@ -294,6 +283,25 @@ impl<'a> NativeCallContext<'a> {
     #[must_use]
     pub fn namespaces(&self) -> &[crate::SharedModule] {
         &self.global.lib
+    }
+    /// _(internals)_ The current [`GlobalRuntimeState`], if any.
+    /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_module`.
+    #[expose_under_internals]
+    #[inline(always)]
+    #[must_use]
+    const fn global_runtime_state(&self) -> &GlobalRuntimeState {
+        self.global
+    }
+    /// _(internals, debugging)_ Debugging interface.
+    /// Exported under the `debugging` and `internals` features only.
+    #[cfg(feature = "debugging")]
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    #[must_use]
+    pub fn debugger(&self) -> Option<&crate::debugger::Debugger> {
+        self.global.debugger.as_deref()
     }
 
     /// Call a function inside the call context with the provided arguments.

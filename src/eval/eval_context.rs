@@ -5,12 +5,16 @@ use crate::ast::FnCallHashes;
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::types::dynamic::Variant;
 use crate::{
-    calc_fn_hash, expose_under_internals, Dynamic, Engine, FnArgsVec, FuncArgs, Position,
-    RhaiResult, RhaiResultOf, Scope, StaticVec, ERR,
+    calc_fn_hash, expose_under_internals, Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString,
+    Position, RhaiResult, RhaiResultOf, Scope, StaticVec, ERR,
 };
-use std::any::type_name;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{
+    any::type_name,
+    mem,
+    ops::{Deref, DerefMut},
+};
 
 /// Context of a script evaluation process.
 #[allow(dead_code)]
@@ -59,6 +63,13 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     pub fn source(&self) -> Option<&str> {
         self.global.source()
     }
+    /// Get a mutable reference to the current source.
+    #[inline(always)]
+    #[must_use]
+    pub fn source_mut(&mut self) -> &mut Option<ImmutableString> {
+        &mut self.global.source
+    }
+
     /// The current [`Scope`].
     #[inline(always)]
     #[must_use]
@@ -123,6 +134,17 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     pub fn namespaces(&self) -> &[crate::SharedModule] {
         &self.global.lib
     }
+    /// _(internals)_ Mutable reference to the current set of namespaces containing definitions of all script-defined functions.
+    /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    #[must_use]
+    pub fn namespaces_mut(&mut self) -> &mut [crate::SharedModule] {
+        self.global.lib.as_mut()
+    }
     /// The current bound `this` pointer, if any.
     #[inline(always)]
     #[must_use]
@@ -140,6 +162,24 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     #[must_use]
     pub const fn call_level(&self) -> usize {
         self.global.level
+    }
+    /// _(internals, debugging)_ Debugging interface.
+    /// Exported under the `debugging` and `internals` features only.
+    #[cfg(feature = "debugging")]
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    #[must_use]
+    pub fn debugger(&self) -> Option<&crate::debugger::Debugger> {
+        self.global.debugger.as_deref()
+    }
+    /// _(internals, debugging)_ Mutable reference to the debugging interface.
+    /// Exported under the `debugging` and `internals` features only.
+    #[cfg(feature = "debugging")]
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    #[must_use]
+    pub fn debugger_mut(&mut self) -> Option<&mut crate::debugger::Debugger> {
+        self.global.debugger.as_deref_mut()
     }
 
     /// Evaluate an [expression tree][crate::Expression] within this [evaluation context][`EvalContext`].
@@ -364,6 +404,69 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
             false,
         )
     }
+
+    /// Create a new isolated runtime frame guard, restoring field values upon `Drop`.
+    ///
+    /// The [frame guard][EvalContextFrameGuard] returned derefs to [`EvalContext`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// // The following pushes a new, empty, caching layer to make sure that new function resolutions
+    /// // do not persist. This is useful if the resolution will be volatile.
+    /// let result: i64 = context.new_frame()
+    ///                          .with_new_caching_layer()
+    ///                          .call_fn("foo", (0_i64,))?;
+    ///
+    /// // In the above example, the resolution to function 'foo' will not be cached outside the frame.
+    /// // The next call to 'foo' will be resolved again instead of using the cached resolution,
+    /// // even if 'foo' is redefined.
+    ///
+    /// // The following modifies the [`EvalContext`] before using, restoring its state afterwards.
+    /// {
+    ///     // Modify the context before using...
+    ///     let context = context.new_frame()
+    ///                          .rewind_scope(true)            // rewinds the scope...
+    ///                          .with_source("new source")     // new source...
+    ///                          .with_namespace(new_module)    // add new namespace module...
+    ///                          .up_call_level();
+    ///
+    ///     // Call a function with the modified context...
+    ///     let result: i64 = context.call_fn("foo", (0_i64,))?;
+    ///
+    ///     // ... at end of block, context automatically restored to previous state.
+    /// }
+    /// ```
+    ///
+    /// ## `Drop` behavior
+    ///
+    /// Upon `Drop`, the following fields will be automatically restored to the previous values:
+    ///
+    /// * the stack of imported [modules][crate::Module] will be rewound to the original depth if more have been added via [`EvalContextFrameGuard::with_import`].
+    /// * the stack of scripted function [modules][crate::Module] will be rewound to the original depth if more have been added via [`EvalContextFrameGuard::with_namespace`].
+    /// * the original functions resolution cache will be restored if a new caching layer was created via [`EvalContextFrameGuard::with_new_caching_layer`].
+    /// * the original [scope][EvalContext::scope] will be rewound if [`EvalContextFrameGuard::rewind_scope`] was set to `true`.
+    /// * the [source][GlobalRuntimeState::source] will be restored if a new source was set via [`EvalContextFrameGuard::with_source`] or cleared via [`EvalContextFrameGuard::clear_source`].
+    /// * the current [nesting level][GlobalRuntimeState::level] of function calls will be restored if modified via [`EvalContextFrameGuard::up_call_level`].
+    /// * the current [`tag`][GlobalRuntimeState::tag] will be restored if modified via [`EvalContextFrameGuard::with_tag`] or [`EvalContextFrameGuard::clear_tag`].
+    pub fn new_frame<'f>(&'f mut self) -> EvalContextFrameGuard<'f, 'a, 's, 'ps, 'g, 'c, 't> {
+        EvalContextFrameGuard {
+            #[cfg(feature = "internals")]
+            #[cfg(not(feature = "no_module"))]
+            imports_len: None,
+            #[cfg(feature = "internals")]
+            #[cfg(not(feature = "no_function"))]
+            lib_len: None,
+            caches_len: None,
+            scope_len: None,
+            source: None,
+            #[cfg(feature = "internals")]
+            level: None,
+            tag: None,
+
+            context: self,
+        }
+    }
 }
 
 /// Call a function (native Rust or scripted) inside the [evaluation context][`EvalContext`].
@@ -430,4 +533,154 @@ fn _call_fn_raw(
             Position::NONE,
         )
         .map(|(r, ..)| r)
+}
+
+/// A new frame guard for [`EvalContext`], restoring field values upon `Drop`.
+pub struct EvalContextFrameGuard<'f, 'a, 's, 'ps, 'g, 'c, 't> {
+    context: &'f mut EvalContext<'a, 's, 'ps, 'g, 'c, 't>,
+
+    caches_len: Option<usize>,
+    scope_len: Option<usize>,
+    #[cfg(feature = "internals")]
+    #[cfg(not(feature = "no_module"))]
+    imports_len: Option<usize>,
+    #[cfg(feature = "internals")]
+    #[cfg(not(feature = "no_function"))]
+    lib_len: Option<usize>,
+    source: Option<Option<ImmutableString>>,
+    #[cfg(feature = "internals")]
+    level: Option<usize>,
+    tag: Option<Dynamic>,
+}
+
+impl Drop for EvalContextFrameGuard<'_, '_, '_, '_, '_, '_, '_> {
+    #[inline(always)]
+    fn drop(&mut self) {
+        if let Some(caches_len) = self.caches_len {
+            self.context.caches.rewind_fn_resolution_caches(caches_len);
+        }
+        if let Some(scope_len) = self.scope_len {
+            self.context.scope.rewind(scope_len);
+        }
+        #[cfg(feature = "internals")]
+        #[cfg(not(feature = "no_module"))]
+        if let Some(imports_len) = self.imports_len {
+            self.context.global.truncate_imports(imports_len);
+        }
+        #[cfg(feature = "internals")]
+        #[cfg(not(feature = "no_function"))]
+        if let Some(lib_len) = self.lib_len {
+            self.context.global.lib.truncate(lib_len);
+        }
+        if let Some(source) = self.source.take() {
+            *self.context.source_mut() = source;
+        }
+        #[cfg(feature = "internals")]
+        if let Some(level) = self.level {
+            self.context.global.level = level;
+        }
+        if let Some(tag) = self.tag.take() {
+            *self.context.tag_mut() = tag;
+        }
+    }
+}
+
+impl<'a, 's, 'ps, 'g, 'c, 't> Deref for EvalContextFrameGuard<'_, 'a, 's, 'ps, 'g, 'c, 't> {
+    type Target = EvalContext<'a, 's, 'ps, 'g, 'c, 't>;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        self.context
+    }
+}
+
+impl<'a, 's, 'ps, 'g, 'c, 't> DerefMut for EvalContextFrameGuard<'_, 'a, 's, 'ps, 'g, 'c, 't> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.context
+    }
+}
+
+impl<'t> EvalContextFrameGuard<'_, '_, '_, '_, '_, '_, 't> {
+    /// Push a new caching layer for function resolution results.
+    pub fn with_new_caching_layer(mut self) -> Self {
+        self.caches_len = Some(self.context.caches.fn_resolution_caches_len());
+        self.context.caches.push_fn_resolution_cache();
+        self
+    }
+    /// Rewind the [scope][EvalContext::scope].
+    #[inline(always)]
+    pub fn rewind_scope(mut self, enable: bool) -> Self {
+        self.scope_len = if enable {
+            Some(self.context.scope().len())
+        } else {
+            None
+        };
+        self
+    }
+    /// Modify the current source.
+    #[inline(always)]
+    pub fn with_source(mut self, source: impl Into<ImmutableString>) -> Self {
+        self.source = Some(Some(source.into()));
+        mem::swap(self.context.source_mut(), self.source.as_mut().unwrap());
+        self
+    }
+    /// Clear the current source.
+    #[inline(always)]
+    pub fn clear_source(mut self) -> Self {
+        self.source = Some(None);
+        mem::swap(self.context.source_mut(), self.source.as_mut().unwrap());
+        self
+    }
+    /// Modify the custom state.
+    #[inline(always)]
+    pub fn with_tag(mut self, tag: Dynamic) -> Self {
+        self.tag = Some(tag);
+        mem::swap(self.context.tag_mut(), self.tag.as_mut().unwrap());
+        self
+    }
+    /// Modify the custom state to [`Dynamic::UNIT`].
+    #[inline(always)]
+    pub fn clear_tag(mut self) -> Self {
+        self.tag = Some(Dynamic::UNIT);
+        mem::swap(self.context.tag_mut(), self.tag.as_mut().unwrap());
+        self
+    }
+    /// _(internals)_ Add a new imported [module][crate::Module].
+    /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_module`.
+    #[cfg(feature = "internals")]
+    #[cfg(not(feature = "no_module"))]
+    pub fn with_import(
+        mut self,
+        name: impl Into<ImmutableString>,
+        module: impl Into<crate::SharedModule>,
+    ) -> Self {
+        self.imports_len = Some(self.context.global.num_imports());
+        self.context.global.push_import(name.into(), module.into());
+        self
+    }
+    /// _(internals)_ Add a new [module][crate::Module] containing script-defined functions.
+    /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(feature = "internals")]
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    #[must_use]
+    pub fn with_namespace(mut self, module: impl Into<crate::SharedModule>) -> Self {
+        self.lib_len = Some(self.context.global.lib.len());
+        self.context.global.lib.push(module.into());
+        self
+    }
+    /// _(internals)_ Increment the current nesting level of function calls.
+    /// Exported under the `internals` feature only.
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    pub fn up_call_level(mut self) -> Self {
+        self.level = Some(self.context.global.level);
+        self.context.global.level += 1;
+        self
+    }
 }
